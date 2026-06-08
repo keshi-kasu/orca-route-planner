@@ -1,7 +1,6 @@
 let locations = [];
 let dataPack = null;
 let quantumDrives = {};
-let quantumDriveData = null;
 
 const FALLBACK_DATA = {
   schemaVersion: 1,
@@ -71,11 +70,7 @@ const ROUTE_TEXT = {
     listTitle: "\u56de\u53ce\u30ea\u30b9\u30c8",
     empty: "\u56de\u53ce\u5730\u70b9\u306a\u3057",
     routeOrigin: "\u56de\u53ce",
-    routeEnd: "\u6700\u7d42\u7d0d\u54c1",
-    shareTitle: "\u3010ORCA \u56de\u53ce -> \u7d0d\u54c1\u30eb\u30fc\u30c8\u3011",
-    fixedPoint: "\u6700\u7d42\u7d0d\u54c1",
-    variableCount: "\u56de\u53ce\u6570",
-    current: "\u73fe\u5728\u5730"
+    routeEnd: "\u6700\u7d42\u7d0d\u54c1"
   },
   deliver: {
     modeLabel: "\u4e00\u62ec\u56de\u53ce -> \u8907\u6570\u7d0d\u54c1",
@@ -85,21 +80,17 @@ const ROUTE_TEXT = {
     listTitle: "\u7d0d\u54c1\u30ea\u30b9\u30c8",
     empty: "\u7d0d\u54c1\u5730\u70b9\u306a\u3057",
     routeOrigin: "\u8ca8\u7269\u56de\u53ce",
-    routeEnd: "\u7d0d\u54c1",
-    shareTitle: "\u3010ORCA \u4e00\u62ec\u56de\u53ce -> \u8907\u6570\u7d0d\u54c1\u30eb\u30fc\u30c8\u3011",
-    fixedPoint: "\u8ca8\u7269\u56de\u53ce",
-    variableCount: "\u7d0d\u54c1\u6570",
-    current: ""
+    routeEnd: "\u7d0d\u54c1"
   }
 };
 const FALLBACK_QUANTUM_DRIVES = [
-  { id: "atlas", name: "Atlas", size: 1, speedKmS: 231000, speedLabel: "231 Mm/s", overheadSeconds: 14.2 },
-  { id: "voyage", name: "Voyage", size: 1, speedKmS: 198000, speedLabel: "198 Mm/s", overheadSeconds: 15.5 },
-  { id: "vk-00", name: "VK-00", size: 1, speedKmS: 266000, speedLabel: "266 Mm/s", overheadSeconds: 18.2 },
-  { id: "crossfield", name: "Crossfield", size: 2, speedKmS: 231000, speedLabel: "231 Mm/s", overheadSeconds: 29.1 },
-  { id: "hemera", name: "Hemera", size: 2, speedKmS: 282000, speedLabel: "282 Mm/s", overheadSeconds: 23.16 },
-  { id: "xl-1", name: "XL-1", size: 2, speedKmS: 324000, speedLabel: "324 Mm/s", overheadSeconds: 30.36 },
-  { id: "ts-2", name: "TS-2", size: 3, speedKmS: 395000, speedLabel: "395 Mm/s", overheadSeconds: 21.2 }
+  { id: "atlas", name: "Atlas", size: 1, speedKmS: 231000, modelOverheadSeconds: 19.71 },
+  { id: "voyage", name: "Voyage", size: 1, speedKmS: 198000, modelOverheadSeconds: 19.49 },
+  { id: "vk-00", name: "VK-00", size: 1, speedKmS: 266000, modelOverheadSeconds: 19.41 },
+  { id: "crossfield", name: "Crossfield", size: 2, speedKmS: 231000, modelOverheadSeconds: 29.71 },
+  { id: "hemera", name: "Hemera", size: 2, speedKmS: 282000, modelOverheadSeconds: 30.54 },
+  { id: "xl-1", name: "XL-1", size: 2, speedKmS: 324000, modelOverheadSeconds: 30.36 },
+  { id: "ts-2", name: "TS-2", size: 3, speedKmS: 395000, modelOverheadSeconds: 45.68 }
 ];
 
 function setInputsEnabled(enabled) {
@@ -175,7 +166,6 @@ function normalizeQuantumDriveData(rawData) {
       name: String(drive.name),
       size: Number(drive.size),
       speedKmS: Number(drive.speedKmS),
-      overheadSeconds: Number(drive.overheadSeconds),
       modelOverheadSeconds: Number.isFinite(Number(drive.modelOverheadSeconds))
         ? Number(drive.modelOverheadSeconds)
         : Number(drive.overheadSeconds)
@@ -213,7 +203,6 @@ async function loadQuantumDriveData() {
 }
 
 function applyQuantumDriveData(pack) {
-  quantumDriveData = pack;
   quantumDrives = Object.fromEntries(pack.drives.map((drive) => [drive.id, drive]));
   renderDriveOptions(pack.drives);
   render();
@@ -400,24 +389,6 @@ function removePickup(id) {
   render();
 }
 
-function movePickup(index, delta) {
-  const next = index + delta;
-  if (next < 0 || next >= state.pickups.length) return;
-  const copy = [...state.pickups];
-  [copy[index], copy[next]] = [copy[next], copy[index]];
-  state.pickups = copy;
-  state.route = buildManualRoute(copy);
-  updateRouteViews(buildRouteResult(state.route, state.mode === "collect" ? state.start : null));
-  renderPickups();
-}
-
-function buildManualRoute(points = state.pickups) {
-  if (!state.destination) return [];
-  return state.mode === "deliver"
-    ? [state.destination, ...points]
-    : [...points, state.destination];
-}
-
 function distance(a, b) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -438,7 +409,7 @@ function currentDrive() {
 }
 
 function estimateTravelSeconds(distanceGm, drive = currentDrive()) {
-  const overhead = Number.isFinite(drive.modelOverheadSeconds) ? drive.modelOverheadSeconds : drive.overheadSeconds;
+  const overhead = Number.isFinite(drive.modelOverheadSeconds) ? drive.modelOverheadSeconds : 0;
   return (distanceGm * 1000000) / drive.speedKmS + overhead;
 }
 

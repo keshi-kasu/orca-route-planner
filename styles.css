@@ -46,7 +46,7 @@ button {
   z-index: -2;
   background:
     linear-gradient(180deg, rgba(3, 9, 16, 0.58), rgba(4, 10, 22, 0.9) 46%, #060e1c 100%),
-    url("assets/space-route-bg.png") center top / cover no-repeat;
+    url("assets/space-route-bg.jpg") center top / cover no-repeat;
 }
 
 .space-bg::after {

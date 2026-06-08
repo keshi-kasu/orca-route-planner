@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ORCA Route Planner</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="space-bg" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="ORCA Route Planner">
+        <span class="brand-mark">ORCA</span>
+        <span class="brand-line"></span>
+        <span class="brand-sub">Route Planner</span>
+      </a>
+      <div class="top-status">
+        <span id="pointCount">0 points</span>
+        <span id="routeMode">collect</span>
+        <span id="dataVersion">data loading</span>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="hero-strip" aria-labelledby="pageTitle">
+        <div>
+          <p class="eyebrow">Delivery Optimization</p>
+          <h1 id="pageTitle">&#37197;&#36948;&#38918;&#12434;&#19968;&#30330;&#12391;&#27770;&#12417;&#12427;</h1>
+        </div>
+        <button class="ghost-button" id="loadSample" type="button">&#12469;&#12531;&#12503;&#12523;&#25237;&#20837;</button>
+      </section>
+
+      <section class="planner-grid" aria-label="route planner">
+        <form class="panel input-panel" id="routeForm" autocomplete="off">
+          <div class="panel-heading">
+            <span class="panel-icon cyan">01</span>
+            <h2>&#22320;&#28857;&#20837;&#21147;</h2>
+          </div>
+
+          <div class="data-card">
+            <div>
+              <span class="summary-label">&#22320;&#28857;&#12487;&#12540;&#12479;</span>
+              <strong id="dataSummary">Loading...</strong>
+            </div>
+            <label class="file-button" for="dataImport">&#26356;&#26032;JSON</label>
+            <input class="visually-hidden" id="dataImport" type="file" accept="application/json,.json">
+          </div>
+
+          <div class="mode-switch" role="group" aria-label="route mode">
+            <button class="mode-button is-active" id="collectMode" type="button" data-route-mode="collect">&#35079;&#25968;&#22238;&#21454; &#8594; &#26368;&#32066;&#32013;&#21697;</button>
+            <button class="mode-button" id="deliverMode" type="button" data-route-mode="deliver">&#19968;&#25324;&#22238;&#21454; &#8594; &#35079;&#25968;&#32013;&#21697;</button>
+          </div>
+
+          <div class="field-stack">
+            <div class="field">
+              <label id="destinationLabel" for="destinationInput">&#26368;&#32066;&#37197;&#36948;&#22320;&#28857;</label>
+              <div class="combo" data-combo="destination">
+                <input id="destinationInput" type="text" placeholder="Nyx Gateway / Sta / Area" aria-expanded="false" aria-controls="destinationSuggestions" disabled>
+                <button class="icon-button" id="clearDestination" type="button" aria-label="clear destination">&times;</button>
+                <div class="suggestions" id="destinationSuggestions" role="listbox"></div>
+              </div>
+            </div>
+
+            <div class="field" id="startField">
+              <label for="startInput">&#29694;&#22312;&#22320;</label>
+              <div class="combo" data-combo="start">
+                <input id="startInput" type="text" placeholder="optional" disabled>
+                <button class="icon-button" id="clearStart" type="button" aria-label="clear current location">&times;</button>
+                <div class="suggestions" id="startSuggestions" role="listbox"></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label id="pickupLabel" for="pickupInput">&#22238;&#21454;&#22320;&#28857;</label>
+              <div class="combo add-combo" data-combo="pickup">
+                <input id="pickupInput" type="text" placeholder="Sta / Area / Everus" disabled>
+                <button class="add-button" id="addPickup" type="button">&#36861;&#21152;</button>
+                <div class="suggestions" id="pickupSuggestions" role="listbox"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="selected-block">
+            <div class="block-title" id="selectedListTitle">&#22238;&#21454;&#12522;&#12473;&#12488;</div>
+            <div class="pickup-list" id="pickupList"></div>
+          </div>
+
+          <div class="actions">
+            <button class="primary-button" id="calculateRoute" type="submit">&#26368;&#30701;&#12523;&#12540;&#12488;&#12434;&#35336;&#31639;</button>
+            <button class="secondary-button" id="resetAll" type="button">&#12522;&#12475;&#12483;&#12488;</button>
+          </div>
+        </form>
+
+        <section class="panel result-panel" aria-labelledby="resultTitle">
+          <div class="panel-heading">
+            <span class="panel-icon violet">02</span>
+            <h2 id="resultTitle">&#26368;&#30701;&#20505;&#35036;</h2>
+          </div>
+
+          <ol class="route-steps" id="routeSteps"></ol>
+        </section>
+
+        <section class="panel distance-panel" aria-labelledby="distanceTitle">
+          <div class="panel-heading">
+            <span class="panel-icon yellow">03</span>
+            <h2 id="distanceTitle">&#36317;&#38626; / &#26178;&#38291;</h2>
+          </div>
+
+          <div class="route-summary">
+            <div>
+              <span class="summary-label">&#32207;&#36317;&#38626; (Gm)</span>
+              <strong id="totalDistance">--</strong>
+            </div>
+            <div>
+              <span class="summary-label">&#31227;&#21205;&#26178;&#38291;</span>
+              <strong id="totalTime">--</strong>
+            </div>
+            <div>
+              <span class="summary-label">&#21306;&#38291;</span>
+              <strong id="legCount">--</strong>
+            </div>
+          </div>
+
+          <div class="leg-table" id="legTable"></div>
+
+          <div class="drive-settings">
+            <label for="driveSelect">Quantum Drive</label>
+            <select id="driveSelect">
+              <option value="atlas">Atlas / 151,951 km/s</option>
+              <option value="voyage">Voyage / 179,856 km/s</option>
+              <option value="crossfield">Crossfield / 190,056 km/s</option>
+              <option value="ts2">TS-2 / 208,047 km/s</option>
+              <option value="hemura">Hemura / 236,688 km/s</option>
+              <option value="xl1" selected>XL-1 / 260,701 km/s</option>
+              <option value="vk00">VK-00 / 283,046 km/s</option>
+            </select>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <template id="emptyPickupTemplate">
+      <div class="empty-state" id="emptyPickupText">&#22238;&#21454;&#22320;&#28857;&#12394;&#12375;</div>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>

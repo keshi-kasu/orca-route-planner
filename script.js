@@ -1,5 +1,7 @@
 let locations = [];
 let dataPack = null;
+let quantumDrives = {};
+let quantumDriveData = null;
 
 const FALLBACK_DATA = {
   schemaVersion: 1,
@@ -90,15 +92,15 @@ const ROUTE_TEXT = {
     current: ""
   }
 };
-const QUANTUM_DRIVES = {
-  atlas: { name: "Atlas", speedKmS: 151951, overheadSeconds: 18 },
-  voyage: { name: "Voyage", speedKmS: 179856, overheadSeconds: 18 },
-  crossfield: { name: "Crossfield", speedKmS: 190056, overheadSeconds: 18 },
-  ts2: { name: "TS-2", speedKmS: 208047, overheadSeconds: 18 },
-  hemura: { name: "Hemura", speedKmS: 236688, overheadSeconds: 18 },
-  xl1: { name: "XL-1", speedKmS: 260701, overheadSeconds: 18 },
-  vk00: { name: "VK-00", speedKmS: 283046, overheadSeconds: 18 }
-};
+const FALLBACK_QUANTUM_DRIVES = [
+  { id: "atlas", name: "Atlas", size: 1, speedKmS: 231000, speedLabel: "231 Mm/s", overheadSeconds: 14.2 },
+  { id: "voyage", name: "Voyage", size: 1, speedKmS: 198000, speedLabel: "198 Mm/s", overheadSeconds: 15.5 },
+  { id: "vk-00", name: "VK-00", size: 1, speedKmS: 266000, speedLabel: "266 Mm/s", overheadSeconds: 18.2 },
+  { id: "crossfield", name: "Crossfield", size: 2, speedKmS: 231000, speedLabel: "231 Mm/s", overheadSeconds: 29.1 },
+  { id: "hemera", name: "Hemera", size: 2, speedKmS: 282000, speedLabel: "282 Mm/s", overheadSeconds: 23.16 },
+  { id: "xl-1", name: "XL-1", size: 2, speedKmS: 324000, speedLabel: "324 Mm/s", overheadSeconds: 30.36 },
+  { id: "ts-2", name: "TS-2", size: 3, speedKmS: 395000, speedLabel: "395 Mm/s", overheadSeconds: 21.2 }
+];
 
 function setInputsEnabled(enabled) {
   combos.forEach((combo) => {
@@ -157,6 +159,93 @@ function applyDataPack(pack) {
   });
   setInputsEnabled(true);
   render();
+}
+
+function normalizeQuantumDriveData(rawData) {
+  const drives = Array.isArray(rawData?.drives) ? rawData.drives : rawData;
+  if (!Array.isArray(drives)) {
+    throw new Error("quantum drives array is missing");
+  }
+
+  const normalizedDrives = drives
+    .filter((drive) => drive && drive.id && drive.name)
+    .map((drive) => ({
+      ...drive,
+      id: String(drive.id),
+      name: String(drive.name),
+      size: Number(drive.size),
+      speedKmS: Number(drive.speedKmS),
+      overheadSeconds: Number(drive.overheadSeconds),
+      modelOverheadSeconds: Number.isFinite(Number(drive.modelOverheadSeconds))
+        ? Number(drive.modelOverheadSeconds)
+        : Number(drive.overheadSeconds)
+    }))
+    .filter((drive) => (
+      drive.size >= 1
+      && drive.size <= 3
+      && Number.isFinite(drive.speedKmS)
+      && drive.speedKmS > 0
+      && Number.isFinite(drive.modelOverheadSeconds)
+    ))
+    .sort((a, b) => a.size - b.size || a.name.localeCompare(b.name, "en"));
+
+  if (!normalizedDrives.length) {
+    throw new Error("no valid quantum drives found");
+  }
+
+  return { ...rawData, drives: normalizedDrives };
+}
+
+async function loadQuantumDriveData() {
+  try {
+    const response = await fetch("data/quantum-drives.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    applyQuantumDriveData(normalizeQuantumDriveData(await response.json()));
+  } catch (error) {
+    applyQuantumDriveData({
+      schemaVersion: 1,
+      gameVersion: "fallback",
+      updatedAt: "local",
+      drives: FALLBACK_QUANTUM_DRIVES
+    });
+    showToast(`Quantum Drive fallback loaded: ${error.message}`);
+  }
+}
+
+function applyQuantumDriveData(pack) {
+  quantumDriveData = pack;
+  quantumDrives = Object.fromEntries(pack.drives.map((drive) => [drive.id, drive]));
+  renderDriveOptions(pack.drives);
+  render();
+}
+
+function renderDriveOptions(drives) {
+  if (!els.driveSelect) return;
+
+  const previousValue = els.driveSelect.value;
+  els.driveSelect.innerHTML = "";
+
+  [1, 2, 3].forEach((size) => {
+    const groupDrives = drives.filter((drive) => drive.size === size);
+    if (!groupDrives.length) return;
+
+    const group = document.createElement("optgroup");
+    group.label = `Size ${size}`;
+    groupDrives.forEach((drive) => {
+      const option = document.createElement("option");
+      option.value = drive.id;
+      option.textContent = `${drive.name} / ${drive.speedKmS.toLocaleString("ja-JP")} km/s`;
+      group.appendChild(option);
+    });
+    els.driveSelect.appendChild(group);
+  });
+
+  if (previousValue && quantumDrives[previousValue]) {
+    els.driveSelect.value = previousValue;
+    return;
+  }
+
+  els.driveSelect.value = quantumDrives["xl-1"] ? "xl-1" : drives[0]?.id || "";
 }
 
 function routeText() {
@@ -342,11 +431,15 @@ function formatDistance(value) {
 }
 
 function currentDrive() {
-  return QUANTUM_DRIVES[els.driveSelect?.value] || QUANTUM_DRIVES.xl1;
+  return quantumDrives[els.driveSelect?.value]
+    || quantumDrives["xl-1"]
+    || FALLBACK_QUANTUM_DRIVES.find((drive) => drive.id === "xl-1")
+    || FALLBACK_QUANTUM_DRIVES[0];
 }
 
 function estimateTravelSeconds(distanceGm, drive = currentDrive()) {
-  return (distanceGm * 1000000) / drive.speedKmS + drive.overheadSeconds;
+  const overhead = Number.isFinite(drive.modelOverheadSeconds) ? drive.modelOverheadSeconds : drive.overheadSeconds;
+  return (distanceGm * 1000000) / drive.speedKmS + overhead;
 }
 
 function estimateTotalSeconds(legs, drive = currentDrive()) {
@@ -829,3 +922,4 @@ els.dataImport.addEventListener("change", async (event) => {
 setInputsEnabled(false);
 render();
 loadLocationData();
+loadQuantumDriveData();
